@@ -1,0 +1,247 @@
+user nginx;
+worker_processes auto;
+error_log /var/log/nginx/error.log;
+pid /run/nginx.pid;
+
+# Load dynamic modules. See /usr/share/nginx/README.dynamic.
+include /usr/share/nginx/modules/*.conf;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
+
+    access_log  /var/log/nginx/access.log  main;
+
+    sendfile            on;
+    tcp_nopush          on;
+    tcp_nodelay         on;
+    keepalive_timeout   65;
+    types_hash_max_size 2048;
+    client_max_body_size 10M;
+
+    include             /etc/nginx/mime.types;
+    default_type        application/octet-stream;
+
+    # Load modular configuration files from the /etc/nginx/conf.d directory.
+    # See http://nginx.org/en/docs/ngx_core_module.html#include
+    # for more information.
+    include /etc/nginx/conf.d/*.conf;
+
+    upstream local_tomcat {
+        server 127.0.0.1:8080;
+    }
+
+    server {
+        listen       443 ssl;
+        
+        # Имя сервера для ЭБшников
+        server_name  sharefileadmin.samspace.local;
+
+        # SSL сертификаты для ЭБшников
+        ssl_certificate     /etc/nginx/ssl/sharefileadmin.samspace.local/fe.local.cer;
+        ssl_certificate_key /etc/nginx/ssl/sharefileadmin.samspace.local/fe.local.key.nopwd;
+		ssl_protocols       TLSv1 TLSv1.1 TLSv1.2;
+		ssl on;
+
+        # Перенаправляем корневую страницу на логин
+        location = / {
+            rewrite / /login/ permanent;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header Host $http_host;
+	        proxy_set_header X-Forwarded-Proto https;
+            proxy_redirect off;
+            proxy_set_header HOST $host;
+	        proxy_pass http://local_tomcat;
+        }
+
+        # Разрешаем доступ ко всему остальному
+        location ~* /.+ {
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header Host $http_host;
+	        proxy_set_header X-Forwarded-Proto https;
+            proxy_redirect off;
+            proxy_set_header HOST $host;
+	        proxy_pass http://local_tomcat;
+        }
+
+        error_page 404 /404.html;
+            location = /40x.html {
+        }
+
+        error_page 500 502 503 504 /50x.html;
+            location = /50x.html {
+        }
+    }
+
+    server {
+        listen       443 ssl;
+        server_name  sharefile.samspace.ru;
+
+        # Имя сервера для контрагентов
+        ssl_certificate     /etc/nginx/ssl/sharefile.samspace.ru/fe.cer;
+        ssl_certificate_key /etc/nginx/ssl/sharefile.samspace.ru/fe.key.nopwd;
+		ssl_protocols       TLSv1 TLSv1.1 TLSv1.2;
+		ssl on;
+
+        # Сперва запрещаем все.
+        location / { deny all; }
+
+        # затем уточняем, что разрешен доступ к корневой странице
+        location = / {
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header Host $http_host;
+	        proxy_set_header X-Forwarded-Proto https;
+            proxy_redirect off;
+            proxy_set_header HOST $host;
+	        proxy_pass http://local_tomcat;
+        }
+
+        # ... к проверкам на черный/белый список
+        location ~* /api/exchanger/checkEmailOf(Black|White) {
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header Host $http_host;
+	        proxy_set_header X-Forwarded-Proto https;
+            proxy_redirect off;
+            proxy_set_header HOST $host;
+	        proxy_pass http://local_tomcat;
+        }
+
+        # ... к ссылке на запрос урла
+        location = /api/login/getUrl {
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header Host $http_host;
+	        proxy_set_header X-Forwarded-Proto https;
+            proxy_redirect off;
+            proxy_set_header HOST $host;
+	        proxy_pass http://local_tomcat;
+        }
+        
+        # ... к переключению между локалями
+        location = /api/getLocale {
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header Host $http_host;
+	        proxy_set_header X-Forwarded-Proto https;
+            proxy_redirect off;
+            proxy_set_header HOST $host;
+	        proxy_pass http://local_tomcat;
+        }
+
+        # ... к справке
+        location = /info {
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header Host $http_host;
+	        proxy_set_header X-Forwarded-Proto https;
+            proxy_redirect off;
+            proxy_set_header HOST $host;
+	        proxy_pass http://local_tomcat;
+        }
+
+        # ... ко всяким js
+        location ~* /polymer/.* {
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header Host $http_host;
+	        proxy_set_header X-Forwarded-Proto https;
+            proxy_redirect off;
+            proxy_set_header HOST $host;
+	        proxy_pass http://local_tomcat;
+        }
+
+        # ... ко всему необходимому на загрузку
+        location ~* /upload/.* {
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header Host $http_host;
+	        proxy_set_header X-Forwarded-Proto https;
+            proxy_redirect off;
+            proxy_set_header HOST $host;
+	        proxy_pass http://local_tomcat;
+        }
+        location ~* /api/exchanger/checkUploadUrl/.* {
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header Host $http_host;
+	        proxy_set_header X-Forwarded-Proto https;
+            proxy_redirect off;
+            proxy_set_header HOST $host;
+	        proxy_pass http://local_tomcat;
+        }
+        location ~* /api/exchanger/template/.* {
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header Host $http_host;
+	        proxy_set_header X-Forwarded-Proto https;
+            proxy_redirect off;
+            proxy_set_header HOST $host;
+	        proxy_pass http://local_tomcat;
+        }
+        location ~* /api/file/uploadWithChunk.* {
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header Host $http_host;
+	        proxy_set_header X-Forwarded-Proto https;
+            proxy_redirect off;
+            proxy_set_header HOST $host;
+	        proxy_pass http://local_tomcat;
+        }
+        location = /api/settings/getParamFileUpload {
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header Host $http_host;
+	        proxy_set_header X-Forwarded-Proto https;
+            proxy_redirect off;
+            proxy_set_header HOST $host;
+	        proxy_pass http://local_tomcat;
+        }
+        location = /api/exchanger/save {
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header Host $http_host;
+	        proxy_set_header X-Forwarded-Proto https;
+            proxy_redirect off;
+            proxy_set_header HOST $host;
+	        proxy_pass http://local_tomcat;
+        }
+        location = /api/file/cancelUpload {
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header Host $http_host;
+	        proxy_set_header X-Forwarded-Proto https;
+            proxy_redirect off;
+            proxy_set_header HOST $host;
+	        proxy_pass http://local_tomcat;
+        }
+
+        # ... к ссылкам на скачивание
+        location ~* /download/.* {
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header Host $http_host;
+	        proxy_set_header X-Forwarded-Proto https;
+            proxy_redirect off;
+            proxy_set_header HOST $host;
+	        proxy_pass http://local_tomcat;
+        }
+        location ~* /api/file/download/.* {
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header Host $http_host;
+	        proxy_set_header X-Forwarded-Proto https;
+            proxy_redirect off;
+            proxy_set_header HOST $host;
+	        proxy_pass http://local_tomcat;
+        }
+	location ~* /api/exchanger/getDepartments(\?locale=(en|ru))? {
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+	    proxy_set_header Host $http_host;
+            proxy_set_header X-Forwarded-Proto https;
+            proxy_redirect off;
+            proxy_set_header HOST $host;
+           proxy_pass http://local_tomcat;
+        }
+
+        error_page 404 /404.html;
+            location = /40x.html {
+        }
+
+        error_page 500 502 503 504 /50x.html;
+            location = /50x.html {
+        }
+    }
+
+}

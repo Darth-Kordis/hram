@@ -1,0 +1,5 @@
+#!/bin/sh -e
+#Здесь вставляем строку с указанием вашего скрипта.
+sleep 10
+psql monkey_db -U postgres -f /tmp/sql/01_init.sql; psql monkey_db -U postgres -f /tmp/sql/02_fill_values.sql; psql monkey_db -U postgres -f /tmp/sql/03_view.sql; psql monkey_db -U postgres -f /tmp/sql/04_fill_test_values.sql
+exit 0

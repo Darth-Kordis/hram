@@ -1,0 +1,20 @@
+	
+	
+	touch /var/run/recovery.lock
+    killall repmgrd
+    gosu postgres pg_ctl stop
+	
+	barman list-backup all
+	
+	barman recover pg_cluster 20170815T041301 /var/lib/postgresql/data/ --target-time "2017-08-15 04:11:26.5" --remote-ssh-command="ssh pgmaster" -j$(nproc)
+	
+	
+	gosu postgres pg_ctl start -o "-c listen_addresses='localhost'"
+    psql -U monkey_user hram -c "SELECT * from sys_users"
+   
+    rm /var/run/recovery.lock
+	
+	barman switch-wal
+	
+	
+	PGPASSWORD=$CHECK_PASSWORD psql -U $CHECK_USER -h localhost template1 -c "show pool_nodes"

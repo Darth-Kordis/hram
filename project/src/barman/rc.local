@@ -1,0 +1,6 @@
+#!/bin/sh -e
+#Здесь вставляем строку с указанием вашего скрипта.
+sleep 30
+barman check pg_cluster
+barman switch-wal pg_cluster
+exit 0
